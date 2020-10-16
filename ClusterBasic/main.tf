@@ -2,46 +2,74 @@ provider "azurerm" {
   features {}
 }
 
-resource "azurerm_resource_group" "example" {
-  name     = "${var.prefix}-k8s-resources"
-  location = var.location
+data "azurerm_suscription" "current" {}
+
+resource "azurerm_resource_group" "rgid" {
+  name     = "rg${local.alias}"
+  location = var.region
 }
 
-resource "azurerm_kubernetes_cluster" "example" {
-  name                = "${var.prefix}-k8s"
-  location            = azurerm_resource_group.example.location
-  resource_group_name = azurerm_resource_group.example.name
-  dns_prefix          = "${var.prefix}-k8s"
+resource "azurerm_container_registry" "acr"{
+  name = "acr${local.alias}01"
+  location = azurerm_resource_group.rgid.location
+  resource_group_name = azurerm_resource_group.rgid.name
+  sku = "Basic"
+  admin_enabled = true
+}
 
-  default_node_pool {
-    name       = "default"
-    node_count = 1
-    vm_size    = "Standard_DS2_v2"
+resource "azurerm_virtual_network" "vnetid"{
+  name = "vnet${local.alias}"
+ location = azurerm_resource_group.rgid.location
+  resource_group_name = azurerm_resource_group.rgid.name
+  address_space = ["11.0.0.0/16"]
+
   }
 
-  identity {
-    type = "SystemAssigned"
-  }
+resource "azurerm_kubernetes_cluster" "aksid"
+{
 
-  addon_profile {
-    aci_connector_linux {
-      enabled = false
-    }
+name = "aks${local.alias}pe"
+  location = azurerm_resource_group.rgid.location
+  resource_group_name = azurerm_resource_group.rgid.name
+dns_prefix = "aks${local.alias}pe"
 
-    azure_policy {
-      enabled = false
-    }
+defauld_node_pool{
+name = "default"
+node_count = local.workers
+vm_size = local.instancia
+min_count=local.workers
+max_count = 5
+os_disk_size_gb = 30
+type="Virtual_MachineScaleSets"
+availabity_zones = [1,2,3]
+enable_auto_scaling = true
+vnet_subnet_id = "/subcriptions/${data.azurerm_suscription.current.subcriptions_id}/resource"
 
-    http_application_routing {
-      enabled = false
-    }
+}
 
-    kube_dashboard {
-      enabled = true
-    }
+service_principal{
+  client_id = local.client_id
+  client_secret=local.clientsecret
+}
 
-    oms_agent {
-      enabled = false
-    }
-  }
+
+network_profile{
+  network_plugin = "azure"
+  load_balancer_sku = "standard"
+}
+
+tag = {
+  Environment = "Production"
+}
+
+
+
+
+
+
+
+}
+
+
+
 }
